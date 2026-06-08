@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QAチェックリスト生成ツール</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <!-- ヘッダーエリア -->
+    <header>
+      <h1>QAチェックリスト生成ツール</h1>
+      <p>
+        Webアプリや業務機能の確認項目を、正常系・異常系・境界値などの観点で整理するためのツールです。
+      </p>
+    </header>
+
+    <!-- 基本情報入力エリア -->
+    <section>
+      <h2>基本情報</h2>
+
+      <div>
+        <label for="projectNameInput">プロジェクト名</label>
+        <input
+          type="text"
+          id="projectNameInput"
+          placeholder="例：ECサイト確認"
+        >
+      </div>
+
+      <div>
+        <label for="featureNameInput">機能名</label>
+        <input
+          type="text"
+          id="featureNameInput"
+          placeholder="例：ログイン機能"
+        >
+      </div>
+
+      <div>
+        <label for="featureDescriptionInput">機能概要</label>
+        <textarea
+          id="featureDescriptionInput"
+          placeholder="例：メールアドレスとパスワードでログインする機能"
+        ></textarea>
+      </div>
+    </section>
+
+    <!-- チェック項目追加エリア -->
+    <section>
+      <h2>チェック項目の追加</h2>
+
+      <div>
+        <label for="categorySelect">カテゴリ</label>
+        <select id="categorySelect">
+          <option value="正常系">正常系</option>
+          <option value="異常系">異常系</option>
+          <option value="境界値">境界値</option>
+          <option value="表示確認">表示確認</option>
+          <option value="操作確認">操作確認</option>
+          <option value="データ保存">データ保存</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="checkItemInput">チェック項目</label>
+        <textarea
+          id="checkItemInput"
+          placeholder="例：正しいメールアドレスとパスワードでログインできる"
+        ></textarea>
+      </div>
+
+      <button id="addItemButton">チェック項目を追加</button>
+
+      <!-- エラーメッセージを表示する場所 -->
+      <p id="errorMessage"></p>
+    </section>
+
+    <!-- チェックリスト表示エリア -->
+    <section>
+      <h2>チェックリスト</h2>
+
+      <div id="projectInfo">
+        <p>プロジェクト名：未入力</p>
+        <p>機能名：未入力</p>
+        <p>機能概要：未入力</p>
+      </div>
+
+      <p id="summaryText">全0件 / 実施済み0件 / 未実施0件</p>
+
+      <ul id="checklistContainer">
+        <li>まだチェック項目がありません。</li>
+      </ul>
+    </section>
+
+    <!-- 操作エリア -->
+    <section>
+      <h2>操作</h2>
+
+      <button id="saveButton">保存する</button>
+      <button id="exportCsvButton">CSV出力</button>
+      <button id="clearButton">全クリア</button>
+    </section>
+  </main>
+
+ <script src="script.js"></script>
+</body>
+</html>
