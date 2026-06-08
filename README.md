@@ -11,11 +11,7 @@ QAチェックリスト生成ツールは、Webアプリや業務機能の確認
 
 ## デモURL
 
-GitHub Pages公開後に記載予定
-
-## スクリーンショット
-
-公開後に画像を追加予定
+https://haru-dev-git.github.io/qa-checklist-tool/
 
 ## 使用技術
 
@@ -108,7 +104,7 @@ CSVには以下の項目を出力します。
 
 詳細な設計内容は以下にまとめています。
 
-- ./docs/design.md
+design.md
 
 設計書には、以下の内容を記載しています。
 
