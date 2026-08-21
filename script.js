@@ -6,7 +6,9 @@
 // HTMLの要素を取得する
 const projectNameInput = document.getElementById("projectNameInput");
 const featureNameInput = document.getElementById("featureNameInput");
-const featureDescriptionInput = document.getElementById("featureDescriptionInput");
+const featureDescriptionInput = document.getElementById(
+  "featureDescriptionInput",
+);
 const categorySelect = document.getElementById("categorySelect");
 const checkItemInput = document.getElementById("checkItemInput");
 const addItemButton = document.getElementById("addItemButton");
@@ -17,6 +19,17 @@ const checklistContainer = document.getElementById("checklistContainer");
 const saveButton = document.getElementById("saveButton");
 const exportCsvButton = document.getElementById("exportCsvButton");
 const clearButton = document.getElementById("clearButton");
+
+const {
+  calculateSummary,
+  createCheckItem,
+  createCsvFileName,
+  createCsvText,
+  loadChecklistState,
+  removeChecklistState,
+  saveChecklistState,
+  validateChecklistInput,
+} = window.QaChecklistLogic;
 
 // チェック項目を保存しておく配列
 let checkItems = [];
@@ -50,63 +63,34 @@ window.addEventListener("load", function () {
 // ID用の連番
 let nextId = 1;
 
-
 // チェック項目を追加する関数
 function addCheckItem() {
-  // 入力値を取得する
-  const projectName = projectNameInput.value.trim();
-  const featureName = featureNameInput.value.trim();
-  const featureDescription = featureDescriptionInput.value.trim();
-  const category = categorySelect.value;
-  const checkItemText = checkItemInput.value.trim();
+  const validation = validateChecklistInput({
+    projectName: projectNameInput.value,
+    featureName: featureNameInput.value,
+    featureDescription: featureDescriptionInput.value,
+    category: categorySelect.value,
+    checkItemText: checkItemInput.value,
+  });
 
-  // エラーメッセージを一度リセットする
-  errorMessage.textContent = "";
-  errorMessage.style.color = "#dc2626";
-  // 入力値チェック
-  if (projectName === "") {
-    errorMessage.textContent = "プロジェクト名を入力してください。";
+  showMessage("");
+
+  if (!validation.isValid) {
+    showMessage(validation.error, "error");
+    const inputsByField = {
+      projectName: projectNameInput,
+      featureName: featureNameInput,
+      featureDescription: featureDescriptionInput,
+      checkItemText: checkItemInput,
+    };
+    inputsByField[validation.field].focus();
     return;
   }
 
-  if (featureName === "") {
-    errorMessage.textContent = "機能名を入力してください。";
-    return;
-  }
-
-  if (checkItemText === "") {
-    errorMessage.textContent = "チェック項目を入力してください。";
-    return;
-  }
-
-  if (projectName.length > 50) {
-    errorMessage.textContent = "プロジェクト名は50文字以内で入力してください。";
-    return;
-  }
-
-  if (featureName.length > 50) {
-    errorMessage.textContent = "機能名は50文字以内で入力してください。";
-    return;
-  }
-
-  if (featureDescription.length > 300) {
-    errorMessage.textContent = "機能概要は300文字以内で入力してください。";
-    return;
-  }
-
-  if (checkItemText.length > 100) {
-    errorMessage.textContent = "チェック項目は100文字以内で入力してください。";
-    return;
-  }
+  const { category, checkItemText } = validation.values;
 
   // 追加するチェック項目データを作る
-  const newItem = {
-    id: nextId,
-    category: category,
-    text: checkItemText,
-    checked: false,
-    createdAt: new Date().toISOString()
-  };
+  const newItem = createCheckItem(nextId, category, checkItemText);
 
   // 配列に追加する
   checkItems.push(newItem);
@@ -170,6 +154,7 @@ function renderChecklist() {
           type="button"
           class="delete-button"
           data-id="${item.id}"
+          aria-label="${escapeHtml(`「${item.text}」を削除`)}"
         >
           削除
         </button>
@@ -210,7 +195,7 @@ function toggleCheckItem(id) {
     if (item.id === id) {
       return {
         ...item,
-        checked: !item.checked
+        checked: !item.checked,
       };
     }
 
@@ -233,11 +218,8 @@ function deleteCheckItem(id) {
 
 // 件数表示を更新する関数
 function renderSummary() {
-  const totalCount = checkItems.length;
-  const checkedCount = checkItems.filter(function (item) {
-    return item.checked === true;
-  }).length;
-  const uncheckedCount = totalCount - checkedCount;
+  const { totalCount, checkedCount, uncheckedCount } =
+    calculateSummary(checkItems);
 
   summaryText.textContent = `全${totalCount}件 / 実施済み${checkedCount}件 / 未実施${uncheckedCount}件`;
 }
@@ -264,49 +246,62 @@ function saveToLocalStorage() {
     featureName: featureName,
     featureDescription: featureDescription,
     checkItems: checkItems,
-    nextId: nextId
+    nextId: nextId,
   };
 
-  // JavaScriptのオブジェクトはそのまま保存できないため、JSON文字列に変換する
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
-
-  errorMessage.textContent = "保存しました。";
-  errorMessage.style.color = "#059669";
+  try {
+    saveChecklistState(localStorage, STORAGE_KEY, saveData);
+    showMessage("保存しました。", "success");
+  } catch {
+    showMessage(
+      "保存に失敗しました。ブラウザの保存設定と空き容量を確認してください。",
+      "error",
+    );
+  }
 }
 
 // localStorageから読み込む関数
 function loadFromLocalStorage() {
-  const savedData = localStorage.getItem(STORAGE_KEY);
-
-  // 保存データがない場合は何もしない
-  if (savedData === null) {
-    return;
-  }
-
   try {
-    const parsedData = JSON.parse(savedData);
+    const parsedData = loadChecklistState(localStorage, STORAGE_KEY);
 
-    projectNameInput.value = parsedData.projectName || "";
-    featureNameInput.value = parsedData.featureName || "";
-    featureDescriptionInput.value = parsedData.featureDescription || "";
+    // 保存データがない場合は何もしない
+    if (parsedData === null) {
+      return;
+    }
 
-    checkItems = parsedData.checkItems || [];
-    nextId = parsedData.nextId || 1;
+    projectNameInput.value = parsedData.projectName;
+    featureNameInput.value = parsedData.featureName;
+    featureDescriptionInput.value = parsedData.featureDescription;
+
+    checkItems = parsedData.checkItems;
+    nextId = parsedData.nextId;
 
     renderProjectInfo();
     renderChecklist();
     renderSummary();
-  } catch (error) {
-    errorMessage.textContent = "保存データの読み込みに失敗しました。";
-    errorMessage.style.color = "#dc2626";
+  } catch {
+    showMessage("保存データの読み込みに失敗しました。", "error");
   }
 }
 
 // 全データをクリアする関数
 function clearAllData() {
-  const result = confirm("入力内容とチェックリストをすべて削除します。よろしいですか？");
+  const result = confirm(
+    "入力内容とチェックリストをすべて削除します。よろしいですか？",
+  );
 
   if (result === false) {
+    return;
+  }
+
+  try {
+    removeChecklistState(localStorage, STORAGE_KEY);
+  } catch {
+    showMessage(
+      "保存データを削除できませんでした。ブラウザの保存設定を確認してください。",
+      "error",
+    );
     return;
   }
 
@@ -321,18 +316,13 @@ function clearAllData() {
   checkItems = [];
   nextId = 1;
 
-  // localStorageからも削除する
-  localStorage.removeItem(STORAGE_KEY);
-
   // 画面を更新する
   renderProjectInfo();
   renderChecklist();
   renderSummary();
 
-  errorMessage.textContent = "すべてのデータを削除しました。";
-  errorMessage.style.color = "#dc2626";
+  showMessage("すべてのデータを削除しました。", "error");
 }
-
 
 // CSVを出力する関数
 function exportCsv() {
@@ -340,98 +330,57 @@ function exportCsv() {
   const featureName = featureNameInput.value.trim();
   const featureDescription = featureDescriptionInput.value.trim();
 
-  // エラーメッセージをリセット
-  errorMessage.textContent = "";
-  errorMessage.style.color = "#dc2626";
+  // メッセージをリセット
+  showMessage("");
 
   // チェック項目がない場合はCSV出力しない
   if (checkItems.length === 0) {
-    errorMessage.textContent = "CSV出力するチェック項目がありません。";
+    showMessage("CSV出力するチェック項目がありません。", "error");
     return;
   }
 
-  // CSVのヘッダー行
-  const headers = [
-    "プロジェクト名",
-    "機能名",
-    "機能概要",
-    "ID",
-    "カテゴリ",
-    "チェック項目",
-    "実施状態",
-    "作成日時"
-  ];
-
-  // チェック項目をCSV用の行に変換する
-  const rows = checkItems.map(function (item) {
-    return [
-      projectName,
-      featureName,
-      featureDescription,
-      item.id,
-      item.category,
-      item.text,
-      item.checked ? "実施済み" : "未実施",
-      item.createdAt
-    ];
-  });
-
-  // ヘッダーとデータ行をまとめる
-  const csvArray = [headers, ...rows];
-
   // CSV文字列に変換する
-  const csvText = csvArray
-    .map(function (row) {
-      return row.map(escapeCsvValue).join(",");
-    })
-    .join("\n");
+  const csvText = createCsvText(
+    { projectName, featureName, featureDescription },
+    checkItems,
+  );
 
-  // Excelで文字化けしにくいようにBOMを付ける
-  const bom = "\uFEFF";
-  const blob = new Blob([bom + csvText], {
-    type: "text/csv;charset=utf-8;"
-  });
+  try {
+    // Excelで文字化けしにくいようにBOMを付ける
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csvText], {
+      type: "text/csv;charset=utf-8;",
+    });
 
-  // ダウンロード用URLを作る
-  const url = URL.createObjectURL(blob);
+    // ダウンロード用URLを作る
+    const url = URL.createObjectURL(blob);
 
-  // ダウンロード用のaタグを一時的に作る
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = createCsvFileName(projectName, featureName);
+    // ダウンロード用のaタグを一時的に作る
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = createCsvFileName(projectName, featureName);
 
-  // aタグをクリックしてダウンロードする
-  document.body.appendChild(link);
-  link.click();
+    try {
+      // aタグをクリックしてダウンロードする
+      document.body.appendChild(link);
+      link.click();
+    } finally {
+      // 使い終わったaタグとURLを削除する
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
 
-  // 使い終わったaタグとURLを削除する
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-
-  errorMessage.textContent = "CSVを出力しました。";
-  errorMessage.style.color = "#059669";
+    showMessage("CSVを出力しました。", "success");
+  } catch {
+    showMessage(
+      "CSVの出力に失敗しました。ブラウザのダウンロード設定を確認してください。",
+      "error",
+    );
+  }
 }
 
-// CSVの1項目を安全な形式に変換する関数
-function escapeCsvValue(value) {
-  const text = String(value ?? "");
-
-  // ダブルクォーテーションは2つに増やす
-  const escapedText = text.replaceAll('"', '""');
-
-  // カンマ、改行、ダブルクォーテーション対策として全体を"で囲む
-  return `"${escapedText}"`;
-}
-
-// CSVファイル名を作る関数
-function createCsvFileName(projectName, featureName) {
-  const safeProjectName = sanitizeFileName(projectName || "project");
-  const safeFeatureName = sanitizeFileName(featureName || "feature");
-
-  return `${safeProjectName}_${safeFeatureName}_qa_checklist.csv`;
-}
-
-// ファイル名に使いにくい文字を置き換える関数
-function sanitizeFileName(fileName) {
-  return fileName.replace(/[\\/:*?"<>|]/g, "_");
+// 成功・エラーメッセージの表示を統一する関数
+function showMessage(message, type = "error") {
+  errorMessage.textContent = message;
+  errorMessage.classList.toggle("is-success", type === "success");
 }
